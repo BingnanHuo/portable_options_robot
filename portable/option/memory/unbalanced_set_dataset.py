@@ -44,6 +44,17 @@ class UnbalancedSetDataset():
             return (x/255.0).float()
         else:
             return x
+
+    @staticmethod
+    def load_data(file_path):
+        data = np.load(file_path, allow_pickle=True)
+        data = torch.from_numpy(data)
+        if torch.max(data) <= 1:
+            data = data*255
+        data = data.int()
+        data = data.squeeze()
+        return data
+        
     
     def get_equal_class_weight(self):
         num_positive = torch.sum(self.labels)
@@ -70,6 +81,9 @@ class UnbalancedSetDataset():
     
     def set_transform_function(self, transform):
         self.transform = transform
+
+    def set_load_data_function(self, load_data):
+        self.load_data = load_data
     
     def save(self, path):
         os.makedirs(path, exist_ok=True)
@@ -112,12 +126,7 @@ class UnbalancedSetDataset():
     def add_true_files(self, file_list):
         for file in file_list:
             file = os.path.join(self.data_dir, file)
-            data = np.load(file, allow_pickle=True)
-            data = torch.from_numpy(data)
-            if torch.max(data) <= 1:
-                data = data*255
-            data = data.int()
-            data = data.squeeze()
+            data = self.load_data(file)
             labels = torch.ones(len(data), dtype=torch.int8)
             self.data = self.concatenate(self.data, data)
             self.labels = self.concatenate(self.labels, labels)
@@ -131,12 +140,7 @@ class UnbalancedSetDataset():
     def add_false_files(self, file_list):
         for file in file_list:
             file = os.path.join(self.data_dir, file)
-            data = np.load(file, allow_pickle=True)
-            data = torch.from_numpy(data)
-            if torch.max(data) <= 1:
-                data = data*255
-            data = data.int()
-            data = data.squeeze()
+            data = self.load_data(file)
             labels = torch.zeros(len(data), dtype=torch.int8)
             self.data = self.concatenate(self.data, data)
             self.labels = self.concatenate(self.labels, labels)
@@ -150,12 +154,7 @@ class UnbalancedSetDataset():
     def add_unlabelled_files(self, file_list):
         for file in file_list:
             file = os.path.join(self.data_dir, file)
-            data = np.load(file)
-            data = torch.from_numpy(data)
-            if torch.max(data) <= 1:
-                data = data*255
-            data = data.int()
-            data = data.squeeze()
+            data = self.load_data(file)
             self.unlabelled_data = self.concatenate(self.unlabelled_data,
                                                     data)
         self.unlabelled_data_length = len(self.unlabelled_data)

@@ -7,20 +7,13 @@ import os
 import numpy as np 
 
 from portable.option.memory import SetDataset, UnbalancedSetDataset
-from portable.option.divdis.models.mlp import MultiHeadMLP, OneHeadMLP
-from portable.option.divdis.models.minigrid_cnn_16x16 import MinigridCNN16x16, MinigridCNNLarge
-from portable.option.divdis.models.minigrid_cnn import MinigridCNN
-from portable.option.divdis.models.monte_cnn import MonteCNN
+from portable.option.divdis.models.effnet_pretrained import EfficientNet
 from portable.option.divdis.divdis import DivDisLoss
 
 logger = logging.getLogger(__name__)
 
 MODEL_TYPE = [
-    "one_head_mlp",
-    "multi_head_mlp",
-    "minigrid_cnn",
-    "minigrid_large_cnn",
-    "monte_cnn"
+    "eff_net"
 ]
 
 
@@ -38,7 +31,7 @@ class DivDisClassifier():
                  
                  l2_reg_weight=0.001,
                  class_weight=None,
-                 dataset_max_size=1e6,
+                 dataset_max_size=int(1e6),
                  dataset_batchsize=32,
                  unlabelled_dataset_batchsize=None,
                  
@@ -117,17 +110,19 @@ class DivDisClassifier():
         )
     
     def reset_classifier(self):
-        if self.model_name == "minigrid_cnn":
-            self.classifier = MinigridCNN(num_classes=self.num_classes,
+        if self.model_name == "eff_net":
+            self.classifier = EfficientNet(num_classes=self.num_classes,
                                           num_heads=self.head_num)
-        elif self.model_name == "monte_cnn":
-            self.classifier = MonteCNN(num_classes=self.num_classes,
-                                       num_heads=self.head_num)
-        elif self.model_name == "minigrid_large_cnn":
-            self.classifier = MinigridCNNLarge(num_classes=self.num_classes,
-                                               num_heads= self.head_num)
+        #elif self.model_name == "monte_cnn":
+        #    self.classifier = MonteCNN(num_classes=self.num_classes,
+        #                               num_heads=self.head_num)
+        #elif self.model_name == "minigrid_large_cnn":
+        #    self.classifier = MinigridCNNLarge(num_classes=self.num_classes,
+        #                                       num_heads= self.head_num)
         else:
             raise ValueError("model_name must be one of {}".format(MODEL_TYPE))
+
+        
         self.classifier.to(self.device)
         self.optimizer = torch.optim.Adam(self.classifier.parameters(),
                                           lr=self.learning_rate,
