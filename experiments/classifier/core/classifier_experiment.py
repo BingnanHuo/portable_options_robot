@@ -21,19 +21,24 @@ from portable.utils.utils import set_seed
 
 
 def transform(x):
-    return x
+    # Convert to float and scale to [0.0, 1.0] range
+    x = x.float() / 255.0
+    # Normalize using the ImageNet mean and std
+    pipeline = transforms.Compose([
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225])
+    ])
+    return pipeline(x)
 
 def load_image(file_path):
     pipeline = transforms.Compose([
         transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(), # Shape (C, H, W) in the range [0.0, 1.0]
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                           std=[0.229, 0.224, 0.225])
+        transforms.CenterCrop(224), 
     ])
     image = Image.open(file_path).convert('RGB')
-    return pipeline(image).unsqueeze(0)  # Shape (1, C, H, W)
-
+    image = pipeline(image)
+    image_tensor = torch.tensor(np.array(image), dtype=torch.uint8).permute(2, 0, 1)  # Shape (C, H, W) in uint8
+    return image_tensor
 
 @gin.configurable 
 class DivDisClassifierExperiment():
@@ -70,7 +75,7 @@ class DivDisClassifierExperiment():
                                            num_classes=classifier_num_classes,
                                            diversity_weight=classifier_diversity_weight,
                                            l2_reg_weight=classifier_l2_reg_weight,
-                                           model_name='eff_net')
+                                           model_name='vit')
         self.classifier.dataset.set_transform_function(transform)
         self.classifier.dataset.set_load_data_function(load_image)
         
@@ -163,7 +168,7 @@ class DivDisClassifierExperiment():
                                  unlabelled_files=unlabelled_files)
     
     def train_classifier(self):
-        self.classifier.train(epochs=self.train_epochs)
+        self.classifier.train(epochs=self.train_epochs, progress_bar=True)
     
     def test_classifier(self,
                         test_positive_files,

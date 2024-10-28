@@ -4,9 +4,12 @@ import random
 import time
 
 import numpy as np
+import glob
 import torch
 from tqdm import tqdm
 #import torch_tensorrt
+from PIL import Image
+from multiprocessing import Pool, cpu_count
 
 from portable.utils.utils import load_gin_configs
 from experiments.classifier.core.classifier_experiment import DivDisClassifierExperiment
@@ -51,17 +54,42 @@ if __name__ == "__main__":
 
         experiment.create_task_dict(dataset_path)
         tasks = list(experiment.task_dict.keys())
+        print(tasks)
         
-        train_tasks = ['microwave','recycle','stove','fridge']
+        train_tasks = ['microwave','recycle']
         for t in train_tasks:
             tasks.remove(t)
         test_tasks = tasks
 
         train_positive_files, train_negative_files,_,_ = experiment.get_data_path(dataset_path, train_tasks, 'term')
         test_positive_files, test_negative_files,_,_ = experiment.get_data_path(dataset_path, test_tasks, 'term')
-        unlabelled_train_files,_,_,_ = experiment.get_data_path(dataset_path, tasks, 'term')
+        
+        unlabelled_train_files = []
 
+        def verify_image(file_path):
+            try:
+                with Image.open(file_path) as img:
+                    img.verify()  
+                return file_path 
+            except (OSError,IOError,SyntaxError):
+                return None
 
+        def filter_valid_files(file_paths):
+            with Pool(cpu_count()) as pool:
+                valid_files = pool.map(verify_image, file_paths)
+            return [file for file in valid_files if file is not None]
+        
+        unlabelled_train_files = test_positive_files + test_negative_files
+        #unlabelled_train_files = glob.glob('resources/jaco/stack/all_images/*.png') + glob.glob('resources/jaco/push/all_images/*.png')
+        push_stack_files = glob.glob('resources/jaco/stack/all_images/*.png') + glob.glob('resources/jaco/push/all_images/*.png')
+        unlabelled_train_files += filter_valid_files(push_stack_files)
+        unlabelled_train_files = random.sample(unlabelled_train_files, int(0.6*len(unlabelled_train_files)))
+
+        #corrupted_files = set(all_files) - set(unlabelled_train_files)
+        #if corrupted_files:
+        #    for file in corrupted_files:
+        #        print(f"Corrupted image found and skipped: {file}")
+                
         print(f"Train Positive Files: {len(train_positive_files)}")
         print(f"Train Negative Files: {len(train_negative_files)}")
         print(f"Unlabelled Train Files: {len(unlabelled_train_files)}")
