@@ -4,16 +4,19 @@ import torch
 import torch.nn as nn
 import gin
 import os
-import numpy as np 
+import numpy as np
+from tqdm import tqdm
 
 from portable.option.memory import SetDataset, UnbalancedSetDataset
 from portable.option.divdis.models.effnet_pretrained import EfficientNet
+from portable.option.divdis.models.maxvit_pretrained import MaxVit
 from portable.option.divdis.divdis import DivDisLoss
 
 logger = logging.getLogger(__name__)
 
 MODEL_TYPE = [
-    "eff_net"
+    "eff_net",
+    "vit"
 ]
 
 
@@ -113,6 +116,9 @@ class DivDisClassifier():
         if self.model_name == "eff_net":
             self.classifier = EfficientNet(num_classes=self.num_classes,
                                           num_heads=self.head_num)
+        elif self.model_name == "vit":
+            self.classifier = MaxVit(num_classes=self.num_classes,
+                                     num_heads=self.head_num)
         #elif self.model_name == "monte_cnn":
         #    self.classifier = MonteCNN(num_classes=self.num_classes,
         #                               num_heads=self.head_num)
@@ -154,12 +160,15 @@ class DivDisClassifier():
     
     def train(self,
               epochs,
-              start_offset=0):
+              start_offset=0,
+              progress_bar=False):
 
         # self.move_to_gpu()
         self.classifier.train()
         
-        for epoch in range(start_offset, start_offset+epochs):
+        for epoch in tqdm(range(start_offset, start_offset+epochs),
+                          desc='Train Epochs', leave=False, dynamic_ncols=True,
+                          disable=(not progress_bar)):
             self.dataset.shuffle()
             counter = 0
             

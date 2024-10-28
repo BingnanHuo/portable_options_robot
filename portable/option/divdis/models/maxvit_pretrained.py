@@ -1,4 +1,3 @@
-
 import torch 
 import torch.nn as nn 
 import torch.nn.functional as F 
@@ -15,21 +14,26 @@ class PrintLayer(torch.nn.Module):
         
         return x
 
-class EfficientNet(nn.Module):
+class MaxVit(nn.Module):
     def __init__(self,
                  num_classes,
                  num_heads):
         super().__init__()
         
-        self.model = nn.ModuleList([models.efficientnet_v2_s(weights='IMAGENET1K_V1') 
-                                    for _ in range(num_heads)])
+        self.model = nn.ModuleList([models.maxvit_t(weights='IMAGENET1K_V1') for _ in range(num_heads)])
         # Freeze the feature extractor
         for idx in range(num_heads):
             self.model[idx].classifier = nn.Sequential(
-                nn.Dropout(p=0.1, inplace=True),
-                nn.LazyLinear(num_classes),
-                )
-            for param in self.model[idx].features.parameters():
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+                nn.LayerNorm(512),
+                nn.Linear(512, 512),
+                nn.Tanh(),
+                nn.Linear(512, num_classes, bias=False),
+            )
+            for param in self.model[idx].stem.parameters():
+                param.requires_grad = False
+            for param in self.model[idx].blocks.parameters():
                 param.requires_grad = False
             for param in self.model[idx].classifier.parameters():
                 param.requires_grad = True
@@ -48,6 +52,3 @@ class EfficientNet(nn.Module):
             pred[:,idx,:] = y
                 
         return pred
-
-
-
