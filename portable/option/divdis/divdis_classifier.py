@@ -1,5 +1,5 @@
 import logging
-from pyexpat import model 
+from regex import P
 import torch
 import torch.nn as nn
 import gin
@@ -8,15 +8,18 @@ import numpy as np
 from tqdm import tqdm
 
 from portable.option.memory import SetDataset, UnbalancedSetDataset
-from portable.option.divdis.models.effnet_pretrained import EfficientNet
-from portable.option.divdis.models.maxvit_pretrained import MaxVit
+from portable.option.divdis.models.effnet import EfficientNet
+from portable.option.divdis.models.maxvit import MaxVit
+from portable.option.divdis.models.theia import Theia
 from portable.option.divdis.divdis import DivDisLoss
 
 logger = logging.getLogger(__name__)
 
 MODEL_TYPE = [
     "eff_net",
-    "vit"
+    "vit",
+    "theia",
+    "one_head_theia"
 ]
 
 
@@ -119,12 +122,9 @@ class DivDisClassifier():
         elif self.model_name == "vit":
             self.classifier = MaxVit(num_classes=self.num_classes,
                                      num_heads=self.head_num)
-        #elif self.model_name == "monte_cnn":
-        #    self.classifier = MonteCNN(num_classes=self.num_classes,
-        #                               num_heads=self.head_num)
-        #elif self.model_name == "minigrid_large_cnn":
-        #    self.classifier = MinigridCNNLarge(num_classes=self.num_classes,
-        #                                       num_heads= self.head_num)
+        elif self.model_name == "theia":
+            self.classifier = Theia(num_classes=self.num_classes,
+                                   num_heads=self.head_num)
         else:
             raise ValueError("model_name must be one of {}".format(MODEL_TYPE))
 
@@ -186,11 +186,12 @@ class DivDisClassifier():
             for _ in range(self.dataset.num_batches):
                 counter += 1
                 x, y = self.dataset.get_batch()
+                # check if all labels are the same
                 if torch.sum(y) == 0 or torch.sum(y) == len(y):
                     continue
                 if use_unlabelled_data:
                     unlabelled_x = self.dataset.get_unlabelled_batch()
-                
+                    
                 x = x.to(self.device)
                 y = y.to(self.device)
                 if use_unlabelled_data:

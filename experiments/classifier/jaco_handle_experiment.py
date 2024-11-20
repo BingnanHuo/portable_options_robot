@@ -54,12 +54,14 @@ if __name__ == "__main__":
 
         experiment.create_task_dict(dataset_path)
         tasks = list(experiment.task_dict.keys())
-        print(tasks)
+        print(f"Tasks: {tasks}")
         
-        train_tasks = ['microwave','recycle']
+        train_tasks = ['microwave']
         for t in train_tasks:
             tasks.remove(t)
         test_tasks = tasks
+        print(f"Train Tasks: {train_tasks}")
+        print(f"Test Tasks: {test_tasks}")
 
         train_positive_files, train_negative_files,_,_ = experiment.get_data_path(dataset_path, train_tasks, 'term')
         test_positive_files, test_negative_files,_,_ = experiment.get_data_path(dataset_path, test_tasks, 'term')
@@ -83,7 +85,7 @@ if __name__ == "__main__":
         #unlabelled_train_files = glob.glob('resources/jaco/stack/all_images/*.png') + glob.glob('resources/jaco/push/all_images/*.png')
         push_stack_files = glob.glob('resources/jaco/stack/all_images/*.png') + glob.glob('resources/jaco/push/all_images/*.png')
         unlabelled_train_files += filter_valid_files(push_stack_files)
-        unlabelled_train_files = random.sample(unlabelled_train_files, int(0.6*len(unlabelled_train_files)))
+        unlabelled_train_files = random.sample(unlabelled_train_files, int(0.5*len(unlabelled_train_files)))
 
         #corrupted_files = set(all_files) - set(unlabelled_train_files)
         #if corrupted_files:
@@ -95,7 +97,7 @@ if __name__ == "__main__":
         print(f"Unlabelled Train Files: {len(unlabelled_train_files)}")
         print(f"Test Positive Files: {len(test_positive_files)}")
         print(f"Test Negative Files: {len(test_negative_files)}")
-        
+
         experiment.add_datafiles(train_positive_files,
                     train_negative_files,
                     unlabelled_train_files)

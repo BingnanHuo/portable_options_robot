@@ -14,6 +14,7 @@ import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
 
 from portable.option.divdis.divdis_classifier import DivDisClassifier
+#from portable.option.divdis.divdis_classifier_no_div import DivDisClassifier
 from portable.option.memory import SetDataset
 from portable.option.memory.unbalanced_set_dataset import UnbalancedSetDataset
 from portable.utils.utils import set_seed
@@ -22,23 +23,23 @@ from portable.utils.utils import set_seed
 
 def transform(x):
     # Convert to float and scale to [0.0, 1.0] range
-    x = x.float() / 255.0
+    #x = x.float() / 255.0
     # Normalize using the ImageNet mean and std
     pipeline = transforms.Compose([
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225])
+        #transforms.Normalize(mean=[0.485, 0.456, 0.406],
+        #                     std=[0.229, 0.224, 0.225])
     ])
     return pipeline(x)
 
 def load_image(file_path):
     pipeline = transforms.Compose([
-        transforms.Resize(256),
+        transforms.Resize(224),
         transforms.CenterCrop(224), 
     ])
     image = Image.open(file_path).convert('RGB')
     image = pipeline(image)
     image_tensor = torch.tensor(np.array(image), dtype=torch.uint8).permute(2, 0, 1)  # Shape (C, H, W) in uint8
-    return image_tensor
+    return image_tensor.unsqueeze(0)
 
 @gin.configurable 
 class DivDisClassifierExperiment():
@@ -53,7 +54,8 @@ class DivDisClassifierExperiment():
                  classifier_num_classes,
                  classifier_diversity_weight,
                  classifier_l2_reg_weight,
-                 classifier_train_epochs):
+                 classifier_train_epochs,
+                 classifier_model_name):
         
         self.seed = seed 
         self.base_dir = base_dir
@@ -75,7 +77,7 @@ class DivDisClassifierExperiment():
                                            num_classes=classifier_num_classes,
                                            diversity_weight=classifier_diversity_weight,
                                            l2_reg_weight=classifier_l2_reg_weight,
-                                           model_name='vit')
+                                           model_name=classifier_model_name)
         self.classifier.dataset.set_transform_function(transform)
         self.classifier.dataset.set_load_data_function(load_image)
         

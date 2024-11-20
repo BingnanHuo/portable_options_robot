@@ -21,7 +21,7 @@ class EfficientNet(nn.Module):
                  num_heads):
         super().__init__()
         
-        self.model = nn.ModuleList([models.efficientnet_v2_s(weights='IMAGENET1K_V1') 
+        self.model = nn.ModuleList([models.efficientnet_v2_m(weights='IMAGENET1K_V1') 
                                     for _ in range(num_heads)])
         # Freeze the feature extractor
         for idx in range(num_heads):

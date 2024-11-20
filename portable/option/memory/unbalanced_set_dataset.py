@@ -40,7 +40,7 @@ class UnbalancedSetDataset():
     
     @staticmethod
     def transform(x):
-        if torch.max(x) > 1:
+        if torch.max(x) > 1 and torch.min(x) >= 0:
             return (x/255.0).float()
         else:
             return x
@@ -49,9 +49,9 @@ class UnbalancedSetDataset():
     def load_data(file_path):
         data = np.load(file_path, allow_pickle=True)
         data = torch.from_numpy(data)
-        if torch.max(data) <= 1:
+        if torch.max(data) <= 1 and torch.min(data) >= 0:
             data = data*255
-        data = data.int()
+        data = data.to(torch.uint8)
         data = data.squeeze()
         return data
         
