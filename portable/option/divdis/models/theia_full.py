@@ -15,15 +15,15 @@ class PrintLayer(torch.nn.Module):
         print(x.shape)
         return x
 
-class Theia(nn.Module):
+class TheiaFull(nn.Module):
     def __init__(self,
                  num_classes,
                  num_heads):
         super().__init__()
         
         self.feature = nn.ModuleList([
-            # Theia-CDiV: CLIP, Dino, ViT
-            AutoModel.from_pretrained("theaiinstitute/theia-base-patch16-224-cdiv", 
+            # Theia-CDDSV: CLIP, Dino, Depth-Anything, SAM, ViT
+            AutoModel.from_pretrained("theaiinstitute/theia-base-patch16-224-cddsv", 
                                       trust_remote_code=True)
                 for _ in range(num_heads)
         ])
@@ -31,13 +31,14 @@ class Theia(nn.Module):
         for idx in range(num_heads):
             for param in self.feature[idx].parameters():
                 param.requires_grad = False
+                
 
         self.classifier = nn.ModuleList([
             nn.Sequential(
                 nn.AdaptiveAvgPool1d(output_size=1),
                 nn.Flatten(start_dim=1, end_dim=-1),
                 nn.LayerNorm(normalized_shape=(768,), eps=1e-05, elementwise_affine=True),
-                nn.LazyLinear(out_features=512, bias=True),
+                nn.LazyLinear(out_features=750, bias=True),
                 nn.Tanh(),
                 nn.LazyLinear(out_features=2, bias=False)
             ) for _ in range(num_heads)

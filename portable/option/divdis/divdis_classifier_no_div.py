@@ -11,7 +11,6 @@ from portable.option.memory import SetDataset, UnbalancedSetDataset
 from portable.option.divdis.models.effnet import EfficientNet
 from portable.option.divdis.models.maxvit import MaxVit
 from portable.option.divdis.models.theia import Theia
-from portable.option.divdis.models.theia_full import TheiaFull
 from portable.option.divdis.divdis import DivDisLoss
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ MODEL_TYPE = [
     "eff_net",
     "vit",
     "theia",
-    "theia_full"
+    "one_head_theia"
 ]
 
 
@@ -32,11 +31,12 @@ class DivDisClassifier():
                  
                  head_num,
                  learning_rate,
+                 num_classes,
                  diversity_weight,
-                 num_classes=2,
                  phi=None,
                  
                  l2_reg_weight=0.001,
+                 class_weight=None,
                  dataset_max_size=int(1e6),
                  dataset_batchsize=32,
                  unlabelled_dataset_batchsize=None,
@@ -54,7 +54,6 @@ class DivDisClassifier():
                                             batchsize=dataset_batchsize,
                                             unlabelled_batchsize=unlabelled_dataset_batchsize)
         self.learning_rate = learning_rate
-        self.momentum = 0.9
         self.l2_reg_weight = l2_reg_weight
         
         self.head_num = head_num
@@ -63,27 +62,26 @@ class DivDisClassifier():
         self.log_dir = log_dir
         self.phi = phi
 
+        
         self.model_name = model_name
         self.reset_classifier()
+        
 
-        '''self.optimizer = torch.optim.Adam(self.classifier.parameters(),
+        self.optimizer = torch.optim.Adam(self.classifier.parameters(),
                                           lr=learning_rate,
-                                          weight_decay=l2_reg_weight # weight decay also works as L2 regularization
-                                          )'''
-        '''self.optimizer = torch.optim.AdamW(self.classifier.parameters(),
-                                          lr=learning_rate,
-                                          weight_decay=l2_reg_weight # weight decay also works as L2 regularization
-                                          )'''
-        self.optimizer = torch.optim.SGD(self.classifier.parameters(),
-                                          lr=learning_rate,
-                                          momentum=self.momentum,
                                           weight_decay=l2_reg_weight # weight decay also works as L2 regularization
                                           )
         
-        self.ce_criterion = torch.nn.CrossEntropyLoss()
-        
         self.divdis_criterion = DivDisLoss(heads=head_num)
-        self.diversity_weight = diversity_weight
+        
+        if class_weight is not None:
+            assert len(class_weight) == num_classes
+            class_weight_tensor = torch.tensor(class_weight, dtype=torch.float).to(self.device)
+        else:
+            class_weight_tensor = torch.ones(num_classes, dtype=torch.float).to(self.device)
+        
+        self.ce_criterion = torch.nn.CrossEntropyLoss(weight=class_weight_tensor)
+        self.diversity_weight = 0 # NOTE: changed to 0, shouldnt matter
         
         self.state_dim = 3
         
@@ -94,7 +92,7 @@ class DivDisClassifier():
         logger.info("learning rate: {}".format(learning_rate))
         logger.info("l2: {}".format(l2_reg_weight))
         logger.info("div weight: {}".format(diversity_weight))
-        
+        logger.info("class weight: {}".format(class_weight))
         logger.info("======================================")
         logger.info("======================================")
         
@@ -116,7 +114,6 @@ class DivDisClassifier():
         self.ce_criterion = torch.nn.CrossEntropyLoss(
             weight=torch.tensor(weights).to(self.device)
         )
-        logger.info("class weight: {}".format(weights))
     
     def reset_classifier(self):
         if self.model_name == "eff_net":
@@ -128,22 +125,23 @@ class DivDisClassifier():
         elif self.model_name == "theia":
             self.classifier = Theia(num_classes=self.num_classes,
                                    num_heads=self.head_num)
-        elif self.model_name == "theia_full":
-            self.classifier = TheiaFull(num_classes=self.num_classes,
-                                       num_heads=self.head_num)
         else:
             raise ValueError("model_name must be one of {}".format(MODEL_TYPE))
+
         
         self.classifier.to(self.device)
-        '''self.optimizer = torch.optim.Adam(self.classifier.parameters(),
+        self.optimizer = torch.optim.Adam(self.classifier.parameters(),
                                           lr=self.learning_rate,
                                           weight_decay=self.l2_reg_weight # weight decay also works as L2 regularization
-                                          )'''
-        self.optimizer = torch.optim.SGD(self.classifier.parameters(),
-                                          lr=self.learning_rate,
-                                          momentum=self.momentum,
-                                          weight_decay=self.l2_reg_weight) # weight decay also works as L2 regularization                                  
+                                          )
         
+    
+    def move_to_gpu(self):
+        if self.use_gpu:
+            self.classifier.to("cuda")
+    
+    def move_to_cpu(self):
+        self.classifier.to("cpu")
     
     def add_data(self,
                  positive_files,
@@ -158,15 +156,14 @@ class DivDisClassifier():
     
     def add_unlabelled_data(self,
                             states):
-        #TODO: maybe add ability to add unlabelled data while running
-        #self.dataset.add_unlabelled_files
-        pass
+        self.dataset.add_unlabelled_files
     
     def train(self,
               epochs,
               start_offset=0,
               progress_bar=False):
 
+        # self.move_to_gpu()
         self.classifier.train()
         
         for epoch in tqdm(range(start_offset, start_offset+epochs),
@@ -189,7 +186,7 @@ class DivDisClassifier():
             for _ in range(self.dataset.num_batches):
                 counter += 1
                 x, y = self.dataset.get_batch()
-                # check if all labels are the same
+
                 if torch.sum(y) == 0 or torch.sum(y) == len(y):
                     continue
                 if use_unlabelled_data:
@@ -218,10 +215,9 @@ class DivDisClassifier():
                 
                 div_loss_tracker += div_loss.item()
 
-                if self.diversity_weight == 0:
-                    objective = labelled_loss
-                else:
-                    objective = labelled_loss + self.diversity_weight*div_loss
+                # NOTE: only change is here, div loss no longer added to the objective, div loss still recorded
+                #objective = labelled_loss + self.diversity_weight*div_loss
+                objective = labelled_loss
                 total_loss_tracker += objective.item()
                 
                 objective.backward()

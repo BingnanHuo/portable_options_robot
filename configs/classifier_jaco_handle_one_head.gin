@@ -3,18 +3,18 @@ import portable.option.divdis.divdis_classifier
 #import portable.option.divdis.divdis_classifier_no_div
 import portable.option.memory.unbalanced_set_dataset
 
-DivDisClassifierExperiment.experiment_name                = "theia_full_first_test"
+DivDisClassifierExperiment.experiment_name                = "theia_one_head"
 DivDisClassifierExperiment.use_gpu                        = 0
 
 DivDisClassifierExperiment.classifier_num_classes         = 2
 
-DivDisClassifierExperiment.classifier_head_num            = 6
-DivDisClassifierExperiment.classifier_learning_rate       = 0.01
-DivDisClassifierExperiment.classifier_diversity_weight    = 0.005
+DivDisClassifierExperiment.classifier_head_num            = 1 #5
+DivDisClassifierExperiment.classifier_learning_rate       = 0.003
+DivDisClassifierExperiment.classifier_diversity_weight    = 0 #0.005
 DivDisClassifierExperiment.classifier_l2_reg_weight       = 0.002
 DivDisClassifierExperiment.classifier_train_epochs        = 15
-DivDisClassifierExperiment.classifier_model_name          = 'theia_full'
+DivDisClassifierExperiment.classifier_model_name          = 'theia'
 
-DivDisClassifier.dataset_batchsize = 64
+DivDisClassifier.dataset_batchsize = 32
 
 UnbalancedSetDataset.class_weights                        = [0.7, 0.3]

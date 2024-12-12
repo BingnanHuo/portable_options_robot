@@ -1,5 +1,4 @@
 import datetime
-import json
 import logging
 import os
 import pickle
@@ -22,24 +21,21 @@ from portable.utils.utils import set_seed
 
 
 def transform(x):
-    # Convert to float and scale to [0.0, 1.0] range
-    #x = x.float() / 255.0
-    # Normalize using the ImageNet mean and std
-    pipeline = transforms.Compose([
-        #transforms.Normalize(mean=[0.485, 0.456, 0.406],
-        #                     std=[0.229, 0.224, 0.225])
-    ])
-    return pipeline(x)
+    return x
 
 def load_image(file_path):
-    pipeline = transforms.Compose([
+    preproc_pipeline = transforms.Compose([
         transforms.Resize(224),
-        transforms.CenterCrop(224), 
+        transforms.CenterCrop(224),
     ])
-    image = Image.open(file_path).convert('RGB')
-    image = pipeline(image)
-    image_tensor = torch.tensor(np.array(image), dtype=torch.uint8).permute(2, 0, 1)  # Shape (C, H, W) in uint8
-    return image_tensor.unsqueeze(0)
+    try:
+        image = Image.open(file_path).convert('RGB')
+        image = preproc_pipeline(image)
+        image_tensor = torch.tensor(np.array(image), dtype=torch.uint8).permute(2, 0, 1)
+        return image_tensor.unsqueeze(0)
+    except Exception as e:
+        print(f"Error loading image {file_path}: {e}")
+        return None
 
 @gin.configurable 
 class DivDisClassifierExperiment():
@@ -60,8 +56,6 @@ class DivDisClassifierExperiment():
         self.seed = seed 
         self.base_dir = base_dir
         self.experiment_name = experiment_name 
-
-        self.task_dict = {}
         
         set_seed(seed)
         
@@ -107,58 +101,6 @@ class DivDisClassifierExperiment():
     def load(self):
         self.classifier.load(path=self.save_dir)
 
-
-    def create_task_dict(self, dataset_path):
-        folders = os.listdir(dataset_path)
-        folders.sort()
-        tasks = [(folder.split('_')[1], folder.split('_')[2]) for folder in folders if len(folder.split('_')) == 3]
-        for task_number, task_name in tasks:
-            if task_name not in self.task_dict:
-                self.task_dict[task_name] = []
-            self.task_dict[task_name].append(task_number)
-        return self.task_dict
-
-    def get_data_path(self, dataset_path, task_names, init_term):
-        if not isinstance(task_names, list):
-            task_names = [task_names]
-
-        matching_folders = []
-        for task_name in task_names:
-            for task_number in self.task_dict.get(task_name, []):
-                folder_name = f"run_{task_number}_{task_name}"
-                folder_path = os.path.join(dataset_path, folder_name, init_term)
-                if os.path.exists(folder_path):
-                    matching_folders.append(folder_path)
-        
-        positive_data_paths = []
-        positive_labels = []
-        negative_data_paths = []
-        negative_labels = []
-
-        for folder in matching_folders:
-            pos_folder = os.path.join(folder, 'positive')
-            neg_folder = os.path.join(folder, 'negative')
-
-            # Load positive images and labels
-            pos_images = sorted(os.listdir(pos_folder))
-            with open(os.path.join(pos_folder, 'labels.json'), 'r') as f:
-                pos_labels = json.load(f)
-            for img in pos_images:
-                if img in pos_labels:
-                    positive_data_paths.append(os.path.join(pos_folder, img))
-                    positive_labels.append(pos_labels[img])
-
-            # Load negative images and labels
-            neg_images = sorted(os.listdir(neg_folder))
-            with open(os.path.join(neg_folder, 'labels.json'), 'r') as f:
-                neg_labels = json.load(f)
-            for img in neg_images:
-                if img in neg_labels:
-                    negative_data_paths.append(os.path.join(neg_folder, img))
-                    negative_labels.append(neg_labels[img])
-
-        return positive_data_paths, negative_data_paths, positive_labels, negative_labels
-
     
     def add_datafiles(self,
                       positive_files,
@@ -170,6 +112,7 @@ class DivDisClassifierExperiment():
                                  unlabelled_files=unlabelled_files)
     
     def train_classifier(self):
+        self.classifier.set_class_weights()
         self.classifier.train(epochs=self.train_epochs, progress_bar=True)
     
     def test_classifier(self,
