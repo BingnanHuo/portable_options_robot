@@ -12,6 +12,7 @@ from portable.option.divdis.models.effnet import EfficientNet
 from portable.option.divdis.models.maxvit import MaxVit
 from portable.option.divdis.models.theia import Theia
 from portable.option.divdis.models.theia_full import TheiaFull
+from portable.option.divdis.models.classifier_only import ClassifierOnly
 from portable.option.divdis.divdis import DivDisLoss
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,8 @@ MODEL_TYPE = [
     "eff_net",
     "vit",
     "theia",
-    "theia_full"
+    "theia_full",
+    "classifier_only",
 ]
 
 
@@ -85,7 +87,7 @@ class DivDisClassifier():
         self.divdis_criterion = DivDisLoss(heads=head_num)
         self.diversity_weight = diversity_weight
         
-        self.state_dim = 3
+        #self.state_dim = 3
         
         logger.info("Classifier hps")
         logger.info("======================================")
@@ -131,6 +133,9 @@ class DivDisClassifier():
         elif self.model_name == "theia_full":
             self.classifier = TheiaFull(num_classes=self.num_classes,
                                        num_heads=self.head_num)
+        elif self.model_name == "classifier_only":
+            self.classifier = ClassifierOnly(num_classes=self.num_classes,
+                                            num_heads=self.head_num)
         else:
             raise ValueError("model_name must be one of {}".format(MODEL_TYPE))
         
@@ -197,6 +202,7 @@ class DivDisClassifier():
                     
                 x = x.to(self.device)
                 y = y.to(self.device)
+
                 if use_unlabelled_data:
                     unlabelled_x = unlabelled_x.to(self.device)
                     unlabelled_pred = self.classifier(unlabelled_x)
@@ -245,8 +251,8 @@ class DivDisClassifier():
         # if use_phi is True:
         #     x = self.phi(x)
         
-        if len(x.shape) == self.state_dim:
-            x = x.unsqueeze(0)
+        #if len(x.shape) == self.state_dim:
+        #    x = x.unsqueeze(0)
         
         x = x.to(self.device)
         
@@ -266,8 +272,8 @@ class DivDisClassifier():
         # if use_phi is True:
         #     x = self.phi(x)
         
-        if len(x.shape) == self.state_dim:
-            x = x.unsqueeze(0)
+        #if len(x.shape) == self.state_dim:
+        #    x = x.unsqueeze(0)
         
         x = x.to(self.device)
         
