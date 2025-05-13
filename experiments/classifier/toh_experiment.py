@@ -45,6 +45,15 @@ def label_data(file_path, object_of_interest, skill_of_interest):
     else:
         return 0
 
+def carry_in_progress(file_path):
+    # load json file
+    with open(file_path, 'r') as f:
+        json_dict = json.load(f)
+    state_dict = json_dict['object_states'] # nested dict [stick: dict for levels (level: objects)]
+    if state_dict['carrying'] is None:
+        return False
+    else:
+        return True
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -78,9 +87,9 @@ if __name__ == "__main__":
     test_time = []
 
     base_dataset_path = 'resources/toh'
-    train_set_name = 'test3_light_on'
-    unlabeled_set_name = ['test1_light_on', 'test2_light_on', 'test4_light_on', 'test5_light_on']
-    test_set_names = ['test6_light_on', 'test7_light_on', 'test8_light_on', 'test9_light_on', 'test10_light_on', 'test11_light_on']
+    train_set_names = [f'test{i}_light_on' for i in [1,2,3,4,5,6,7,8]]
+    unlabeled_set_names = [f'test{i}_light_on' for i in [9,10,11,12,13,14,15]]
+    test_set_names = [f'test{i}_light_on' for i in [16,17,18,19,20]]
 
     object_of_interest = ['cylinder', 2, 'blue'] # (shape, size, color)
     skill_of_interest = ['middle'] # (stick, level)
@@ -88,9 +97,24 @@ if __name__ == "__main__":
     # all datasets (seeds) containg the object of interest goes in labeled data. One set (task / seed) is used for training, the rest for testing. 
     # all other data goes in unlabelled data.
 
-    train_set_path = os.path.join(base_dataset_path, train_set_name)
-    train_image_paths = glob.glob(os.path.join(train_set_path, 'images', '*.npy'))
-    train_json_paths = glob.glob(os.path.join(train_set_path, 'images','*.json'))
+
+    train_image_paths = []
+    train_json_paths = []
+    for i in range(len(train_set_names)):
+        train_set_path = os.path.join(base_dataset_path, train_set_names[i])
+        #test_image_paths += glob.glob(os.path.join(test_set_path, 'images', '*.jpg'))
+        train_image_paths += glob.glob(os.path.join(train_set_path, 'images', '*.npy'))
+        train_json_paths += glob.glob(os.path.join(train_set_path, 'images','*.json'))
+
+    idx_to_remove = []
+    for j in range(len(train_image_paths)):
+        cur_img = train_image_paths[j]
+        cur_json = train_json_paths[j]
+        if carry_in_progress(cur_json):
+            idx_to_remove.append(j)
+    train_image_paths = [train_image_paths[i] for i in range(len(train_image_paths)) if i not in idx_to_remove]
+    train_json_paths = [train_json_paths[i] for i in range(len(train_json_paths)) if i not in idx_to_remove]
+        
 
     test_image_paths = []
     test_json_paths = []
@@ -99,25 +123,15 @@ if __name__ == "__main__":
         #test_image_paths += glob.glob(os.path.join(test_set_path, 'images', '*.jpg'))
         test_image_paths += glob.glob(os.path.join(test_set_path, 'images', '*.npy'))
         test_json_paths += glob.glob(os.path.join(test_set_path, 'images','*.json'))
-        '''print(f"Test set {i}: {test_set_path}")
-        print(f"Number of images: {len(test_image_paths)}")
-        print(f"Number of json files: {len(test_json_paths)}")
-        # Extract base names (without extension) for the current set
-        current_image_paths_in_set = glob.glob(os.path.join(test_set_path, 'images', '*.npy'))
-        current_json_paths_in_set = glob.glob(os.path.join(test_set_path, 'images','*.json'))
-        
-        image_basenames = {os.path.splitext(os.path.basename(p))[0] for p in current_image_paths_in_set}
-        json_basenames = {os.path.splitext(os.path.basename(p))[0] for p in current_json_paths_in_set}
+    idx_to_remove = []
+    for j in range(len(test_image_paths)):
+        cur_img = test_image_paths[j]
+        cur_json = test_json_paths[j]
+        if carry_in_progress(cur_json):
+            idx_to_remove.append(j)
+    test_image_paths = [test_image_paths[i] for i in range(len(test_image_paths)) if i not in idx_to_remove]
+    test_json_paths = [test_json_paths[i] for i in range(len(test_json_paths)) if i not in idx_to_remove]
 
-        # Find images without corresponding json in the current set
-        images_without_json = image_basenames - json_basenames
-        if images_without_json:
-            print(f"Images without corresponding JSON in {test_set_names[i]}: {images_without_json}")
-
-        # Find json without corresponding images in the current set (optional check)
-        json_without_images = json_basenames - image_basenames
-        if json_without_images:
-            print(f"JSON without corresponding images in {test_set_names[i]}: {json_without_images}")'''
             
     train_image_paths.sort()
     train_json_paths.sort()
@@ -127,26 +141,19 @@ if __name__ == "__main__":
 
     unlabeled_image_paths = []
     unlabeled_json_paths = []
-    for i in range(len(unlabeled_set_name)):
-        unlabeled_set_path = os.path.join(base_dataset_path, unlabeled_set_name[i])
+    for i in range(len(unlabeled_set_names)):
+        unlabeled_set_path = os.path.join(base_dataset_path, unlabeled_set_names[i])
         unlabeled_image_paths += glob.glob(os.path.join(unlabeled_set_path, 'images', '*.npy'))
         unlabeled_json_paths += glob.glob(os.path.join(unlabeled_set_path, 'images','*.json'))
-        '''# Extract base names (without extension) for the current set
-        current_image_paths_in_set = glob.glob(os.path.join(unlabeled_set_path, 'images', '*.npy'))
-        current_json_paths_in_set = glob.glob(os.path.join(unlabeled_set_path, 'images','*.json'))
+    idx_to_remove = []
+    for j in range(len(unlabeled_image_paths)):
+        cur_img = unlabeled_image_paths[j]
+        cur_json = unlabeled_json_paths[j]
+        if carry_in_progress(cur_json):
+            idx_to_remove.append(j)
+    unlabeled_image_paths = [unlabeled_image_paths[i] for i in range(len(unlabeled_image_paths)) if i not in idx_to_remove]
+    unlabeled_json_paths = [unlabeled_json_paths[i] for i in range(len(unlabeled_json_paths)) if i not in idx_to_remove]
 
-        image_basenames = {os.path.splitext(os.path.basename(p))[0] for p in current_image_paths_in_set}
-        json_basenames = {os.path.splitext(os.path.basename(p))[0] for p in current_json_paths_in_set}
-
-        # Find images without corresponding json in the current set
-        images_without_json = image_basenames - json_basenames
-        if images_without_json:
-            print(f"Images without corresponding JSON in {unlabeled_set_name[i]}: {images_without_json}")
-
-        # Find json without corresponding images in the current set (optional check)
-        json_without_images = json_basenames - image_basenames
-        if json_without_images:
-            print(f"JSON without corresponding images in {unlabeled_set_name[i]}: {json_without_images}")'''
     assert len(unlabeled_image_paths) == len(unlabeled_json_paths), f"Number of images and json files do not match in {unlabeled_set_path}"
     
 
@@ -174,7 +181,6 @@ if __name__ == "__main__":
         else:
             test_negative_files.append(image_path)
     assert len(test_positive_files) + len(test_negative_files) == len(test_image_paths), f"Number of positive and negative files do not match in test sets"
-
 
     unlabeled_files = unlabeled_image_paths
 
